@@ -149,10 +149,6 @@ const Login = () => {
           </CardContent>
         </Card>
 
-        {/* Admin credentials info */}
-        <div className="mt-6 p-4 bg-primary-light rounded-xl border border-primary/20">
-          <p className="text-sm text-primary text-center font-inter">
-            🔑 Identifiants admin : admin@csint.com / admin123
           </p>
         </div>
       </div>
