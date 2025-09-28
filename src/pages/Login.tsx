@@ -146,14 +146,12 @@ const Login = () => {
                 </Link>
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-          </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
-export default Login;
+  export default Login;
+
