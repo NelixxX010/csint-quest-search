@@ -1,8 +1,54 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { useState } from "react";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import { useToast } from "@/hooks/use-toast";
 
 const SearchSection = () => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const { trackSearch } = useAnalytics();
+  const { toast } = useToast();
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!query.trim()) {
+      toast({
+        title: "Recherche vide",
+        description: "Veuillez saisir un terme de recherche",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSearching(true);
+    
+    // Simulate search results
+    setTimeout(() => {
+      const mockResults = [
+        `Résultat pour "${query}" - Site officiel`,
+        `${query} - Wikipedia`,
+        `Guide complet sur ${query}`,
+        `${query} - Actualités récentes`,
+        `Forum de discussion sur ${query}`
+      ];
+      
+      setResults(mockResults);
+      setIsSearching(false);
+      
+      // Track the search
+      trackSearch(query, mockResults.length);
+      
+      toast({
+        title: "Recherche terminée",
+        description: `${mockResults.length} résultats trouvés`,
+      });
+    }, 1500);
+  };
+
   return (
     <section className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-2xl text-center fade-in">
@@ -22,22 +68,59 @@ const SearchSection = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-8">
-          <div className="flex items-center bg-white rounded-2xl shadow-large border border-border hover:shadow-xlarge transition-shadow duration-300 p-2">
+        <form onSubmit={handleSearch} className="w-full max-w-2xl flex gap-3 fade-in-delay">
+          <div className="flex-1 relative">
             <Input
               type="text"
               placeholder="Rechercher sur CSint..."
-              className="flex-1 border-0 bg-transparent text-lg font-inter placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-4"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-14 pl-12 pr-4 text-base font-inter border-2 border-white/20 rounded-2xl bg-white/90 backdrop-blur-sm shadow-large focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300"
             />
-            <Button 
-              size="lg"
-              className="bg-gradient-primary hover:bg-primary-hover text-white rounded-xl shadow-medium search-btn-hover font-inter font-semibold px-8"
-            >
-              <Search className="w-5 h-5 mr-2" />
-              Rechercher
-            </Button>
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
           </div>
-        </div>
+          <Button 
+            type="submit"
+            size="lg"
+            disabled={isSearching}
+            className="h-14 px-8 bg-gradient-primary hover:bg-primary-hover text-white font-inter font-semibold rounded-2xl shadow-large hover-lift transition-all duration-300 disabled:opacity-70"
+          >
+            <Search className="w-5 h-5 mr-2" />
+            {isSearching ? 'Recherche...' : 'Rechercher'}
+          </Button>
+        </form>
+
+        {/* Search Results */}
+        {results.length > 0 && (
+          <div className="w-full max-w-2xl mt-8 fade-in">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xlarge p-6 border border-white/20">
+              <h3 className="text-lg font-poppins font-semibold text-foreground mb-4">
+                Résultats de recherche ({results.length})
+              </h3>
+              <div className="space-y-3">
+                {results.map((result, index) => (
+                  <div key={index} className="p-3 hover:bg-primary/5 rounded-xl transition-colors cursor-pointer">
+                    <p className="text-primary hover:text-primary-hover font-inter font-medium">
+                      {result}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Description du résultat de recherche pour "{query}"
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSearching && (
+          <div className="w-full max-w-2xl mt-8 fade-in">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xlarge p-8 border border-white/20 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-foreground font-inter">Recherche en cours...</p>
+            </div>
+          </div>
+        )}
 
         {/* Quick Links */}
         <div className="flex flex-wrap justify-center gap-3">

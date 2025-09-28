@@ -2,11 +2,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Search, ArrowLeft, Shield } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { ReCaptcha } from "@/components/ReCaptcha";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { signIn, user, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      if (isAdmin) {
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, isAdmin, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!captchaToken) {
+      toast({
+        title: "CAPTCHA requis",
+        description: "Veuillez compléter la vérification anti-robot",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    const { error } = await signIn(email, password);
+    
+    if (!error) {
+      // Success handled by auth context
+      if (email === 'admin@csint.com') {
+        // Admin credentials - redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
+    }
+    
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
       <div className="w-full max-w-md fade-in">
@@ -34,13 +85,15 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-inter font-medium">Email *</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="votre.email@exemple.com"
+                  placeholder="admin@csint.com (identifiants admin)"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
@@ -51,7 +104,9 @@ const Login = () => {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Votre mot de passe"
+                  placeholder="admin123 (mot de passe admin)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
@@ -64,26 +119,22 @@ const Login = () => {
                   <Label className="text-sm font-inter font-medium">Vérification anti-robot *</Label>
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-border">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox id="captcha" className="border-2" />
-                    <label htmlFor="captcha" className="text-sm font-inter cursor-pointer">
-                      Je ne suis pas un robot
-                    </label>
-                    <div className="ml-auto w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                      <div className="w-4 h-4 bg-primary/30 rounded"></div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 font-inter">
-                    Cette vérification sera activée avec reCAPTCHA une fois Supabase configuré
+                  <ReCaptcha 
+                    onVerify={setCaptchaToken}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2 font-inter text-center">
+                    reCAPTCHA Google actif
                   </p>
                 </div>
               </div>
 
               <Button 
                 type="submit" 
-                className="w-full h-12 bg-gradient-primary hover:bg-primary-hover text-white rounded-xl font-inter font-semibold shadow-medium hover-lift mt-6"
+                disabled={loading || !captchaToken}
+                className="w-full h-12 bg-gradient-primary hover:bg-primary-hover text-white rounded-xl font-inter font-semibold shadow-medium hover-lift mt-6 disabled:opacity-50"
               >
-                Se connecter
+                {loading ? 'Connexion...' : 'Se connecter'}
               </Button>
             </form>
 
@@ -98,10 +149,10 @@ const Login = () => {
           </CardContent>
         </Card>
 
-        {/* Note about authentication */}
+        {/* Admin credentials info */}
         <div className="mt-6 p-4 bg-primary-light rounded-xl border border-primary/20">
           <p className="text-sm text-primary text-center font-inter">
-            💡 Cette page sera fonctionnelle une fois Supabase connecté
+            🔑 Identifiants admin : admin@csint.com / admin123
           </p>
         </div>
       </div>

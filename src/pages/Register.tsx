@@ -2,10 +2,55 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Search, ArrowLeft, User, Mail, Lock, UserPlus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signUp, user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({
+        title: "Erreur",
+        description: "Les mots de passe ne correspondent pas",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Erreur",
+        description: "Le mot de passe doit contenir au moins 6 caractères",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    await signUp(email, password, username);
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
       <div className="w-full max-w-md fade-in">
@@ -33,46 +78,66 @@ const Register = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-inter font-medium">Nom d'utilisateur *</Label>
+                <Label htmlFor="username" className="text-sm font-inter font-medium flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Nom d'utilisateur *
+                </Label>
                 <Input
                   id="username"
                   type="text"
                   placeholder="Votre nom d'utilisateur"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-inter font-medium">Email *</Label>
+                <Label htmlFor="email" className="text-sm font-inter font-medium flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Email *
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="votre.email@exemple.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-inter font-medium">Mot de passe *</Label>
+                <Label htmlFor="password" className="text-sm font-inter font-medium flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Mot de passe *
+                </Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Votre mot de passe"
+                  placeholder="Minimum 6 caractères"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-inter font-medium">Confirmer mot de passe *</Label>
+                <Label htmlFor="confirmPassword" className="text-sm font-inter font-medium flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Confirmer mot de passe *
+                </Label>
                 <Input
                   id="confirmPassword"
                   type="password"
                   placeholder="Confirmez votre mot de passe"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   className="h-12 bg-white border-border rounded-xl font-inter"
                 />
@@ -80,9 +145,11 @@ const Register = () => {
 
               <Button 
                 type="submit" 
-                className="w-full h-12 bg-gradient-primary hover:bg-primary-hover text-white rounded-xl font-inter font-semibold shadow-medium hover-lift mt-6"
+                disabled={loading}
+                className="w-full h-12 bg-gradient-primary hover:bg-primary-hover text-white rounded-xl font-inter font-semibold shadow-medium hover-lift mt-6 disabled:opacity-50"
               >
-                S'inscrire
+                <UserPlus className="w-5 h-5 mr-2" />
+                {loading ? 'Inscription...' : 'S\'inscrire'}
               </Button>
             </form>
 
@@ -97,10 +164,10 @@ const Register = () => {
           </CardContent>
         </Card>
 
-        {/* Note about authentication */}
+        {/* Inscription active */}
         <div className="mt-6 p-4 bg-primary-light rounded-xl border border-primary/20">
           <p className="text-sm text-primary text-center font-inter">
-            💡 Cette page sera fonctionnelle une fois Supabase connecté
+            ✅ Inscription active avec Supabase
           </p>
         </div>
       </div>
