@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Navigate } from 'react-router-dom';
-import { Users, Search, TrendingUp, Eye, FileSearch, Database } from 'lucide-react';
+import { Users, Search, TrendingUp, Eye, FileSearch, Upload, Trash2 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,8 +22,17 @@ interface DashboardStats {
 
 interface FileSearchResult {
   file: string;
+  type: string;
   line: number;
   content: string;
+}
+
+interface UploadedFile {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
 }
 
 const Dashboard = () => {
@@ -33,6 +42,8 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const { toast } = useToast();
 
   const loadDashboardStats = async () => {
@@ -139,6 +150,126 @@ const Dashboard = () => {
       .slice(0, 10);
   };
 
+  const loadUploadedFiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('uploaded_files')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUploadedFiles(data || []);
+    } catch (error) {
+      console.error('Error loading files:', error);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validExtensions = ['.sql', '.db', '.txt'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!validExtensions.includes(fileExtension)) {
+      toast({
+        title: "Type de fichier invalide",
+        description: "Seuls les fichiers .sql, .db et .txt sont acceptés",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10485760) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: "La taille maximale est de 10MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      // Upload to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('searchable-files')
+        .upload(file.name, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Save file metadata to database
+      const { error: dbError } = await supabase
+        .from('uploaded_files')
+        .insert({
+          filename: file.name,
+          file_path: uploadData.path,
+          file_type: fileExtension.replace('.', ''),
+          file_size: file.size,
+          uploaded_by: user?.id
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Fichier téléchargé",
+        description: `${file.name} a été téléchargé avec succès`,
+      });
+
+      loadUploadedFiles();
+      
+      // Reset input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Erreur d'upload",
+        description: "Impossible de télécharger le fichier",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string, filename: string) => {
+    try {
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('searchable-files')
+        .remove([filename]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('uploaded_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Fichier supprimé",
+        description: `${filename} a été supprimé`,
+      });
+
+      loadUploadedFiles();
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: "Erreur de suppression",
+        description: "Impossible de supprimer le fichier",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleFileSearch = async () => {
     if (!searchQuery.trim()) {
       toast({
@@ -151,16 +282,17 @@ const Dashboard = () => {
 
     setLoadingSearch(true);
     try {
-      const response = await fetch(`/api/search?query=${encodeURIComponent(searchQuery)}`);
-      if (!response.ok) {
-        throw new Error('Erreur lors de la recherche');
-      }
-      const results = await response.json();
-      setSearchResults(results);
+      const { data, error } = await supabase.functions.invoke('search-files', {
+        body: { query: searchQuery }
+      });
+
+      if (error) throw error;
+
+      setSearchResults(data || []);
       
       toast({
         title: "Recherche terminée",
-        description: `${results.length} résultat(s) trouvé(s)`,
+        description: `${data?.length || 0} résultat(s) trouvé(s)`,
       });
     } catch (error) {
       console.error('Search error:', error);
@@ -177,6 +309,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (!loading && user && isAdmin) {
       loadDashboardStats();
+      loadUploadedFiles();
     }
   }, [user, isAdmin, loading]);
 
@@ -332,6 +465,71 @@ const Dashboard = () => {
           </>
         )}
 
+        {/* File Upload Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Gestion des fichiers
+            </CardTitle>
+            <CardDescription>
+              Téléchargez des fichiers .sql, .db, et .txt pour les rendre disponibles à la recherche
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-6">
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {uploadingFile ? 'Upload en cours...' : 'Cliquez pour télécharger un fichier'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Formats acceptés: .sql, .db, .txt (max 10MB)
+                  </p>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".sql,.db,.txt"
+                  onChange={handleFileUpload}
+                  disabled={uploadingFile}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Uploaded Files List */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm text-muted-foreground mb-3">
+                  Fichiers disponibles ({uploadedFiles.length})
+                </h3>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {uploadedFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{file.filename}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(file.file_size / 1024).toFixed(2)} KB • {file.file_type.toUpperCase()} • {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteFile(file.id, file.filename)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* File Search Section */}
         <Card>
           <CardHeader>
@@ -340,7 +538,7 @@ const Dashboard = () => {
               Moteur de recherche de fichiers
             </CardTitle>
             <CardDescription>
-              Recherchez dans les fichiers .sql, .db, et .txt du serveur
+              Recherchez dans tous les fichiers téléchargés
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -354,13 +552,13 @@ const Dashboard = () => {
               />
               <Button 
                 onClick={handleFileSearch} 
-                disabled={loadingSearch}
+                disabled={loadingSearch || uploadedFiles.length === 0}
                 className="flex items-center gap-2"
               >
                 {loadingSearch ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
-                  <Database className="h-4 w-4" />
+                  <Search className="h-4 w-4" />
                 )}
                 Rechercher
               </Button>
@@ -375,14 +573,19 @@ const Dashboard = () => {
                 {searchResults.map((result, index) => (
                   <div key={index} className="p-3 bg-muted rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-primary">
-                        {result.file}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-primary">
+                          {result.file}
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
+                          {result.type.toUpperCase()}
+                        </span>
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         Ligne {result.line}
                       </span>
                     </div>
-                    <code className="text-sm bg-background p-2 rounded block whitespace-pre-wrap">
+                    <code className="text-sm bg-background p-2 rounded block whitespace-pre-wrap overflow-x-auto">
                       {result.content}
                     </code>
                   </div>
@@ -393,6 +596,12 @@ const Dashboard = () => {
             {searchQuery && searchResults.length === 0 && !loadingSearch && (
               <p className="text-center text-muted-foreground py-4">
                 Aucun résultat trouvé pour "{searchQuery}"
+              </p>
+            )}
+
+            {uploadedFiles.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">
+                Aucun fichier disponible. Téléchargez des fichiers pour commencer la recherche.
               </p>
             )}
           </CardContent>

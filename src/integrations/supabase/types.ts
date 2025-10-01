@@ -270,6 +270,39 @@ export type Database = {
         }
         Relationships: []
       }
+      uploaded_files: {
+        Row: {
+          created_at: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          filename: string
+          id: string
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          filename: string
+          id?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          filename?: string
+          id?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       user_warnings: {
         Row: {
           active: boolean | null

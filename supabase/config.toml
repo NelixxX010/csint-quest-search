@@ -1,1 +1,4 @@
 project_id = "majqmlacdefktatvskld"
+
+[functions.search-files]
+verify_jwt = false
